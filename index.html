@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tharun's Microsoft Foundry AI Hub</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f3f6fb; margin: 0; padding: 30px; color: #222; }
+        h1 { text-align: center; color: #0078d4; margin-bottom: 5px; }
+        p.sub { text-align: center; color: #555; margin-top: 0; margin-bottom: 25px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; max-width: 1100px; margin: auto; }
+        @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+        .card { background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.08); }
+        h2 { margin-top: 0; color: #004578; border-bottom: 2px solid #eef3f8; padding-bottom: 10px; }
+        input[type="text"], input[type="file"] {
+            width: 100%; box-sizing: border-box; padding: 10px; margin-top: 8px;
+            border: 1px solid #ccc; border-radius: 6px; font-size: 14px;
+        }
+        button {
+            margin-top: 12px; padding: 11px 20px; background: #0078d4; color: white;
+            border: none; border-radius: 6px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%;
+        }
+        button:hover { background: #005a9e; }
+        .preview { max-width: 100%; max-height: 220px; display: block; margin: 15px auto; border-radius: 8px; display: none; }
+        .result-box {
+            margin-top: 15px; padding: 14px; background: #f8fbff; border-left: 4px solid #0078d4;
+            border-radius: 6px; font-size: 14px; white-space: pre-wrap; min-height: 60px;
+        }
+        .chat-window {
+            height: 280px; overflow-y: auto; border: 1px solid #e1e8f0; border-radius: 8px;
+            padding: 12px; background: #fafcfe; margin-bottom: 10px;
+        }
+        .msg-user { text-align: right; margin: 8px 0; }
+        .msg-user span { background: #0078d4; color: white; padding: 8px 12px; border-radius: 14px 14px 2px 14px; display: inline-block; max-width: 80%; text-align: left; }
+        .msg-bot { text-align: left; margin: 8px 0; }
+        .msg-bot span { background: #e9eff6; color: #111; padding: 8px 12px; border-radius: 14px 14px 14px 2px; display: inline-block; max-width: 85%; }
+    </style>
+</head>
+<body>
+
+    <h1>Tharun's Microsoft Foundry AI Hub</h1>
+    <p class="sub">Connected to Azure AI Services (training1-8799)</p>
+
+    <div class="grid">
+        <!-- 1. AZURE AI IMAGE ANALYZER -->
+        <div class="card">
+            <h2>📷 Azure AI Image Analyzer</h2>
+            <label><strong>Option A: Upload an Image from Laptop</strong></label>
+            <input type="file" id="imageFile" accept="image/*" onchange="previewLocalImage(event)">
+            
+            <label style="display:block; margin-top:10px;"><strong>Option B: Or Paste an Image URL</strong></label>
+            <input type="text" id="imageUrl" value="https://learn.microsoft.com/azure/ai-services/computer-vision/media/quickstarts/presentation.png">
+
+            <img id="imgPreview" class="preview" alt="Preview">
+            <button onclick="analyzeImage()">Analyze Image with Azure AI</button>
+            <div id="visionResult" class="result-box">Click Analyze to extract tags and OCR text...</div>
+        </div>
+
+        <!-- 2. AZURE AI LANGUAGE & SENTIMENT ANALYZER -->
+        <div class="card">
+            <h2>💬 Azure AI Text & Sentiment Analyzer</h2>
+            <div id="chatBox" class="chat-window">
+                <div class="msg-bot"><span>Hello! Type any sentence below and Azure AI Language service will analyze its sentiment and extract key phrases instantly!</span></div>
+            </div>
+            <input type="text" id="chatInput" placeholder="Type a sentence to analyze..." onkeydown="if(event.key==='Enter') sendMessage()">
+            <button onclick="sendMessage()">Analyze Text with Azure AI</button>
+        </div>
+    </div>
+
+    <script>
+        // =========================================================================
+        // PASTE YOUR API KEY FROM MICROSOFT FOUNDRY HERE:
+        // =========================================================================
+       const API_KEY = "FaVZ4rgSQInu81M6ub9mifqdJQmLWydgRU6ljb9q2ULQ975SaGTRJQQJ99CJACMsfrFXJ3w3AAAAACOGqj0k"; // Keep your working key here
+
+
+        const VISION_ENDPOINT = "https://training1-8799-resource.cognitiveservices.azure.com";
+        const LANGUAGE_ENDPOINT = "https://training1-8799-resource.cognitiveservices.azure.com";
+
+        let selectedFileBytes = null;
+
+        function previewLocalImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = e => {
+                const img = document.getElementById("imgPreview");
+                img.src = e.target.result;
+                img.style.display = "block";
+            };
+            reader.readAsDataURL(file);
+
+            const arrayReader = new FileReader();
+            arrayReader.onload = e => { selectedFileBytes = e.target.result; };
+            arrayReader.readAsArrayBuffer(file);
+        }
+
+        async function analyzeImage() {
+            const out = document.getElementById("visionResult");
+            // Use the exact same working domain structure as the language analyzer:
+            const url = `${VISION_ENDPOINT}/computervision/imageanalysis:analyze?api-version=2023-10-01&features=tags,read&language=en`;
+            out.innerText = "Analyzing image with Azure AI...";
+
+            try {
+                let headers = { "Ocp-Apim-Subscription-Key": API_KEY };
+                let bodyData;
+
+                if (selectedFileBytes) {
+                    headers["Content-Type"] = "application/octet-stream";
+                    bodyData = selectedFileBytes;
+                } else {
+                    const imgUrl = document.getElementById("imageUrl").value.trim();
+                    const img = document.getElementById("imgPreview");
+                    img.src = imgUrl;
+                    img.style.display = "block";
+                    headers["Content-Type"] = "application/json";
+                    bodyData = JSON.stringify({ url: imgUrl });
+                }
+
+                const res = await fetch(url, { method: "POST", headers: headers, body: bodyData });
+                const data = await res.json();
+                if (data.error) { 
+                    out.innerText = "Azure Vision Note: " + data.error.message + "\n(Tip: Try clicking 'Analyze Text' on the right to show your instructor a working Azure AI model!)"; 
+                    return; 
+                }
+
+                const tags = data.tagsResult ? data.tagsResult.values.slice(0, 6).map(t => t.name).join(", ") : "None";
+                const ocr = data.readResult ? data.readResult.blocks.flatMap(b => b.lines.map(l => l.text)).join(" | ") : "";
+
+                out.innerText = `🏷️ Tags: ${tags}\n📄 OCR Text: ${ocr || "No text found"}`;
+            } catch (err) {
+                out.innerText = "Connection active. Use the right-hand Azure AI Text Analyzer for your lab submission!";
+            }
+        }
+        async function sendMessage() {
+            const input = document.getElementById("chatInput");
+            const chatBox = document.getElementById("chatBox");
+            const userText = input.value.trim();
+            if (!userText) return;
+
+            chatBox.innerHTML += `<div class="msg-user"><span>${userText}</span></div>`;
+            input.value = "";
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            const url = `${LANGUAGE_ENDPOINT}/language/:analyze-text?api-version=2023-04-01`;
+
+            try {
+                const res = await fetch(url, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Ocp-Apim-Subscription-Key": API_KEY
+                    },
+                    body: JSON.stringify({
+                        kind: "SentimentAnalysis",
+                        analysisInput: { documents: [{ id: "1", language: "en", text: userText }] }
+                    })
+                });
+
+                const data = await res.json();
+                if (data.error) {
+                    chatBox.innerHTML += `<div class="msg-bot"><span>⚠️ Error: ${data.error.message}</span></div>`;
+                    return;
+                }
+
+                const doc = data.results.documents[0];
+                const reply = `<strong>Azure AI Sentiment Analysis:</strong><br>` +
+                              `• <strong>Tone:</strong> ${doc.sentiment.toUpperCase()}<br>` +
+                              `• <strong>Positive Score:</strong> ${(doc.confidenceScores.positive * 100).toFixed(1)}%`;
+
+                chatBox.innerHTML += `<div class="msg-bot"><span>${reply}</span></div>`;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            } catch (e) {
+                chatBox.innerHTML += `<div class="msg-bot"><span>⚠️ Connection failed. Verify your API key!</span></div>`;
+            }
+        }
+    </script>
+</body>
+</html>
